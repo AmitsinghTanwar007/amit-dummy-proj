@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 from openpyxl import load_workbook
 
@@ -108,6 +108,67 @@ def default_config() -> Config:
         advisor_template_file=ADVISOR_TEMPLATE_FILE,
         advisor_id=ADVISOR_ID,
         output_base_directory=OUTPUT_BASE_DIRECTORY,
+    )
+
+
+def require_input(value: str, field_name: str) -> str:
+    """Return trimmed interactive input or reject an empty response."""
+
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field_name} is required.")
+    return normalized
+
+
+def resolve_input_path(value: str, field_name: str) -> Path:
+    """Resolve a required relative or absolute path entered by the user."""
+
+    return Path(require_input(value, field_name)).expanduser().resolve()
+
+
+def parse_financial_year_input(value: str) -> int:
+    """Convert an interactive financial-year response to an integer."""
+
+    normalized = require_input(value, "Financial year")
+    try:
+        return int(normalized)
+    except ValueError as error:
+        raise ValueError("Financial year must be a four-digit integer.") from error
+
+
+def interactive_config(input_function: Callable[[str], str] = input) -> Config:
+    """Prompt for runtime values and return a validated immutable configuration."""
+
+    input_excel = resolve_input_path(
+        input_function("Excel file path: "),
+        "Excel file path",
+    )
+    financial_year = parse_financial_year_input(
+        input_function("Financial year (for example, 2026): ")
+    )
+    directory_id = require_input(
+        input_function("15-digit Directory/Client ID: "),
+        "Directory ID",
+    )
+    advisor_id = require_input(
+        input_function("5-digit Advisor ID: "),
+        "Advisor ID",
+    )
+    output_directory = resolve_input_path(
+        input_function("Base output directory: "),
+        "Base output directory",
+    )
+    return validate_config(
+        Config(
+            input_excel=input_excel,
+            financial_year=financial_year,
+            directory_id=directory_id,
+            template_file=TEMPLATE_FILE,
+            member_template_file=MEMBER_TEMPLATE_FILE,
+            advisor_template_file=ADVISOR_TEMPLATE_FILE,
+            advisor_id=advisor_id,
+            output_base_directory=output_directory,
+        )
     )
 
 
@@ -694,9 +755,9 @@ def generate_finance_files(config: Config) -> tuple[GeneratedFiles, FinanceSumma
 
 
 def main() -> None:
-    """Generate all three files using the hardcoded first-version settings."""
+    """Prompt for runtime settings and generate all three files."""
 
-    output_files, summary = generate_finance_files(default_config())
+    output_files, summary = generate_finance_files(interactive_config())
     print(f"Generated finance file: {output_files.financial}")
     print(f"Generated member file: {output_files.member}")
     print(f"Generated advisor file: {output_files.advisor}")

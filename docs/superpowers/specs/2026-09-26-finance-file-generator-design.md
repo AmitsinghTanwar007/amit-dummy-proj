@@ -6,16 +6,17 @@ Build a Python program that reads a source Excel workbook, filters and aggregate
 
 ## Configuration
 
-The first version uses constants near the top of the Python module for:
+When the module is executed, it interactively prompts for:
 
 - input Excel path;
 - financial year;
 - 15-digit Directory ID;
-- three template paths;
-- base output directory; and
-- five-digit Advisor ID.
+- five-digit Advisor ID; and
+- base output directory.
 
-These settings can be replaced with command-line arguments in a later version without changing the transformation functions.
+Relative paths are resolved from the current working directory, and absolute paths are accepted unchanged. The three template paths remain fixed relative to the Python module. Input values are converted into the existing immutable `Config` object, so the transformation functions remain independent of the interactive interface.
+
+`default_config()` remains available for automated tests and programmatic use. `interactive_config()` owns prompting and input conversion. Invalid input produces a clear error and no output files are generated.
 
 ## Required source columns
 
@@ -122,3 +123,5 @@ Transformation functions accept inputs and return new values rather than modifyi
 ## Verification
 
 Automated checks will run the generator against `sample_data/Finance_Dummy_Input.xlsx` for financial year `2026`. They verify all three output paths, record structures, updated identifiers, earliest on-date, blank off-date, footer types, and finance monthly and annual totals.
+
+Tests also mock the five interactive responses and verify that relative paths, year, Directory ID, Advisor ID, and output directory are mapped to the expected configuration fields.

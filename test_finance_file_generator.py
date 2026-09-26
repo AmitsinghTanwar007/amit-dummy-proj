@@ -15,6 +15,7 @@ from finance_file_generator import (
     filter_by_codes,
     format_amount,
     generate_finance_files,
+    interactive_config,
     reconstruct_template_records,
     split_record,
 )
@@ -36,6 +37,31 @@ class FormattingTests(unittest.TestCase):
     def test_amount_format(self) -> None:
         self.assertEqual(format_amount(Decimal("336.17")), "0000000000000336.17")
         self.assertEqual(format_amount(Decimal("0")), "0000000000000000.00")
+
+
+class InteractiveConfigTests(unittest.TestCase):
+    def test_five_responses_build_expected_config(self) -> None:
+        project_config = default_config()
+        responses = iter(
+            (
+                str(project_config.input_excel),
+                "2026",
+                "000000023353484",
+                "87689",
+                "not-yet-created-output",
+            )
+        )
+
+        config = interactive_config(lambda _prompt: next(responses))
+
+        self.assertEqual(config.input_excel, project_config.input_excel.resolve())
+        self.assertEqual(config.financial_year, 2026)
+        self.assertEqual(config.directory_id, "000000023353484")
+        self.assertEqual(config.advisor_id, "87689")
+        self.assertEqual(
+            config.output_base_directory,
+            (Path.cwd() / "not-yet-created-output").resolve(),
+        )
 
 
 class IntegrationTests(unittest.TestCase):
