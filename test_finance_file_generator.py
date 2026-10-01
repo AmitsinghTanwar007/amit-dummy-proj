@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -192,7 +193,9 @@ class IntegrationTests(unittest.TestCase):
             )
 
             configs = interactive_configs(lambda _prompt: next(responses))
-            results = generate_finance_files_for_configs(configs)
+            results = generate_finance_files_for_configs(
+                configs, datetime(2026, 10, 1, 9, 45, 59)
+            )
 
             self.assertEqual(
                 [(summary.policy_number, summary.annual_total) for _files, summary in results],
@@ -203,9 +206,18 @@ class IntegrationTests(unittest.TestCase):
                 ],
             )
             expected_outputs = (
-                output_folder / "111111111111111" / "2024" / "financial.txt",
-                output_folder / "111111111111111" / "2026" / "financial.txt",
-                output_folder / "222222222222222" / "2027" / "financial.txt",
+                output_folder
+                / "111111111111111"
+                / "2024"
+                / "RMM1ITCFIN2024001202610010945",
+                output_folder
+                / "111111111111111"
+                / "2026"
+                / "RMM1ITCFIN2026001202610010945",
+                output_folder
+                / "222222222222222"
+                / "2027"
+                / "RMM1ITCFIN2027001202610010945",
             )
             self.assertTrue(all(path.is_file() for path in expected_outputs))
             self.assertTrue(all(files.member.is_file() and files.advisor.is_file() for files, _summary in results))
@@ -223,19 +235,29 @@ class IntegrationTests(unittest.TestCase):
                 advisor_id="87689",
                 output_base_directory=Path(temporary_directory),
             )
-            output_files, summary = generate_finance_files(config)
+            generated_at = datetime(2026, 10, 1, 9, 45, 59)
+            output_files, summary = generate_finance_files(config, generated_at)
 
             self.assertEqual(
                 output_files.financial,
-                Path(temporary_directory) / "563410000070095" / "2026" / "financial.txt",
+                Path(temporary_directory)
+                / "563410000070095"
+                / "2026"
+                / "RMM1ITCFIN2026001202610010945",
             )
             self.assertEqual(
                 output_files.member,
-                Path(temporary_directory) / "563410000070095" / "2026" / "member.txt",
+                Path(temporary_directory)
+                / "563410000070095"
+                / "2026"
+                / "RMM1ITCMEM2026002202610010945",
             )
             self.assertEqual(
                 output_files.advisor,
-                Path(temporary_directory) / "563410000070095" / "2026" / "advisor.txt",
+                Path(temporary_directory)
+                / "563410000070095"
+                / "2026"
+                / "RMM1ITCADV2026003202610010945",
             )
             self.assertTrue(all(path.is_file() for path in (
                 output_files.financial, output_files.member, output_files.advisor

@@ -52,6 +52,12 @@ ARREARS_COLUMN = "ARREARS AMOUNT"
 ZERO = Decimal("0.00")
 MAX_FINANCE_AMOUNT = Decimal("9999999999999999.99")
 EXCEL_FILE_SUFFIXES = (".xlsx", ".xlsm")
+FINANCE_FILE_PREFIX = "FIN"
+MEMBER_FILE_PREFIX = "MEM"
+ADVISOR_FILE_PREFIX = "ADV"
+FINANCE_FILE_SEQUENCE = "001"
+MEMBER_FILE_SEQUENCE = "002"
+ADVISOR_FILE_SEQUENCE = "003"
 
 
 @dataclass(frozen=True)
@@ -836,6 +842,23 @@ def build_output_path(
     return base_directory / policy_number / str(financial_year) / file_name
 
 
+def format_output_timestamp(generated_at: datetime) -> str:
+    """Return the output timestamp segment as YYYYMMDDHHMM."""
+
+    return generated_at.strftime("%Y%m%d%H%M")
+
+
+def build_output_file_name(
+    file_prefix: str, financial_year: int, sequence_number: str, generated_at: datetime
+) -> str:
+    """Build one generated output file name without an extension."""
+
+    return (
+        f"RMM1ITC{file_prefix}{financial_year}"
+        f"{sequence_number}{format_output_timestamp(generated_at)}"
+    )
+
+
 def write_output_file(output_path: Path, contents: str) -> Path:
     """Create output directories and write one generated text file."""
 
@@ -844,10 +867,13 @@ def write_output_file(output_path: Path, contents: str) -> Path:
     return output_path
 
 
-def generate_finance_files(config: Config) -> tuple[GeneratedFiles, FinanceSummary]:
+def generate_finance_files(
+    config: Config, generated_at: datetime | None = None
+) -> tuple[GeneratedFiles, FinanceSummary]:
     """Run the shared pipeline and write finance, member, and advisor files."""
 
     checked = validate_config(config)
+    output_timestamp = generated_at or datetime.now()
     source_rows = read_source_rows(checked.input_excel)
     code_filtered = filter_by_codes(source_rows)
     transactions = filter_and_parse_financial_year(code_filtered, checked.financial_year)
@@ -875,13 +901,37 @@ def generate_finance_files(config: Config) -> tuple[GeneratedFiles, FinanceSumma
     )
     paths = GeneratedFiles(
         financial=build_output_path(
-            checked.output_base_directory, summary.policy_number, checked.financial_year, "financial.txt"
+            checked.output_base_directory,
+            summary.policy_number,
+            checked.financial_year,
+            build_output_file_name(
+                FINANCE_FILE_PREFIX,
+                checked.financial_year,
+                FINANCE_FILE_SEQUENCE,
+                output_timestamp,
+            ),
         ),
         member=build_output_path(
-            checked.output_base_directory, summary.policy_number, checked.financial_year, "member.txt"
+            checked.output_base_directory,
+            summary.policy_number,
+            checked.financial_year,
+            build_output_file_name(
+                MEMBER_FILE_PREFIX,
+                checked.financial_year,
+                MEMBER_FILE_SEQUENCE,
+                output_timestamp,
+            ),
         ),
         advisor=build_output_path(
-            checked.output_base_directory, summary.policy_number, checked.financial_year, "advisor.txt"
+            checked.output_base_directory,
+            summary.policy_number,
+            checked.financial_year,
+            build_output_file_name(
+                ADVISOR_FILE_PREFIX,
+                checked.financial_year,
+                ADVISOR_FILE_SEQUENCE,
+                output_timestamp,
+            ),
         ),
     )
     written = GeneratedFiles(
@@ -893,13 +943,14 @@ def generate_finance_files(config: Config) -> tuple[GeneratedFiles, FinanceSumma
 
 
 def generate_finance_files_for_configs(
-    configs: Sequence[Config],
+    configs: Sequence[Config], generated_at: datetime | None = None
 ) -> tuple[tuple[GeneratedFiles, FinanceSummary], ...]:
     """Generate output files for each configured workbook/year run."""
 
     if not configs:
         raise ValueError("At least one generation configuration is required.")
-    return tuple(generate_finance_files(config) for config in configs)
+    output_timestamp = generated_at or datetime.now()
+    return tuple(generate_finance_files(config, output_timestamp) for config in configs)
 
 
 def main() -> None:

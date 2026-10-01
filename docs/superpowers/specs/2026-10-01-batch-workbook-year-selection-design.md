@@ -23,6 +23,14 @@ The existing `Config` object and `generate_finance_files(config)` function remai
 
 This keeps the workbook parsing, filtering, aggregation, template transformation, and output writing behavior unchanged for each individual run.
 
+## Output File Names
+
+Generated files remain under `<base output directory>/<policy number>/<financial year>/`, but the file names are generated from the file type, financial year, record sequence, and current timestamp. The timestamp uses `YYYYMMDDHHMM` and does not include seconds.
+
+- Finance: `RMM1ITCFIN<YEAR>001<YYYYMMDDHHMM>`
+- Member: `RMM1ITCMEM<YEAR>002<YYYYMMDDHHMM>`
+- Advisor: `RMM1ITCADV<YEAR>003<YYYYMMDDHHMM>`
+
 ## Errors
 
 Input validation remains fail-fast. Invalid mode, missing folder, empty folder, invalid year list, duplicate years, invalid identifiers, missing templates, or missing input files stop the run with a clear exception before generation proceeds.
@@ -38,4 +46,5 @@ Tests cover:
 - accepting numbered and text mode choices;
 - building multiple configs from single mode;
 - discovering `.xlsx` and `.xlsm` files in folder mode while ignoring other files and Excel lock files; and
+- generating timestamped finance, member, and advisor file names without seconds; and
 - preserving the existing end-to-end generation behavior for the sample workbook.
