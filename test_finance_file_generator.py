@@ -154,31 +154,11 @@ class InteractiveConfigTests(unittest.TestCase):
 
 
 class IntegrationTests(unittest.TestCase):
-    def test_multiple_dummy_workbooks_generate_each_requested_year(self) -> None:
+    def test_multiple_sample_workbooks_generate_each_requested_year(self) -> None:
         project_config = default_config()
         with tempfile.TemporaryDirectory() as temporary_directory:
-            base = Path(temporary_directory)
-            input_folder = base / "input"
-            output_folder = base / "output"
-            input_folder.mkdir()
-
-            first = input_folder / "first.xlsx"
-            second = input_folder / "second.xlsx"
-            write_dummy_workbook(
-                first,
-                (
-                    ("111111111111111", "2023-03-10", "NA", "00000", "100.00"),
-                    ("111111111111111", "2025-04-20", "NA", "", "200.00"),
-                    ("111111111111111", "2025-05-01", "NB", "", "999.00"),
-                ),
-            )
-            write_dummy_workbook(
-                second,
-                (
-                    ("222222222222222", "2026-12-15", "NA", None, "300.00"),
-                    ("222222222222222", "2027-01-05", "NA", "00000", "400.00"),
-                ),
-            )
+            input_folder = project_config.input_excel.parent / "multiple_years"
+            output_folder = Path(temporary_directory) / "output"
 
             responses = iter(
                 (
