@@ -7,18 +7,43 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from openpyxl import Workbook
+
 from finance_file_generator import (
     Config,
     MONTH_NAMES,
     SourceRow,
     default_config,
+    discover_excel_files,
     filter_by_codes,
     format_amount,
     generate_finance_files,
+    generate_finance_files_for_configs,
     interactive_config,
+    interactive_configs,
+    parse_financial_years_input,
+    parse_run_mode_input,
     reconstruct_template_records,
     split_record,
 )
+
+
+EXCEL_HEADERS = (
+    "Policy Number",
+    "System Date",
+    "Transaction Code",
+    "Reversal File Code",
+    "Transaction Amount",
+)
+
+
+def write_dummy_workbook(path: Path, rows: tuple[tuple[object, ...], ...]) -> None:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(EXCEL_HEADERS)
+    for row in rows:
+        worksheet.append(row)
+    workbook.save(path)
 
 
 class FilteringTests(unittest.TestCase):
@@ -63,8 +88,128 @@ class InteractiveConfigTests(unittest.TestCase):
             (Path.cwd() / "not-yet-created-output").resolve(),
         )
 
+    def test_comma_separated_years_are_parsed_in_given_order(self) -> None:
+        self.assertEqual(parse_financial_years_input("2026, 2024,2028"), (2026, 2024, 2028))
+
+    def test_duplicate_years_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must not contain duplicates"):
+            parse_financial_years_input("2026,2026")
+
+    def test_mode_accepts_numbered_and_text_choices(self) -> None:
+        self.assertEqual(parse_run_mode_input("1"), "single")
+        self.assertEqual(parse_run_mode_input("multiple"), "multiple")
+
+    def test_single_mode_builds_one_config_per_requested_year(self) -> None:
+        project_config = default_config()
+        responses = iter(
+            (
+                "single",
+                str(project_config.input_excel),
+                "2026,2024",
+                "000000023353484",
+                "87689",
+                "not-yet-created-output",
+            )
+        )
+
+        configs = interactive_configs(lambda _prompt: next(responses))
+
+        self.assertEqual([config.input_excel for config in configs], [project_config.input_excel.resolve()] * 2)
+        self.assertEqual([config.financial_year for config in configs], [2026, 2024])
+        self.assertEqual(
+            [config.output_base_directory for config in configs],
+            [(Path.cwd() / "not-yet-created-output").resolve()] * 2,
+        )
+
+    def test_multiple_mode_discovers_folder_files_and_prompts_each_year_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            folder = Path(temporary_directory)
+            first = folder / "a.xlsx"
+            second = folder / "b.xlsm"
+            ignored_text = folder / "notes.txt"
+            ignored_temporary = folder / "~$open.xlsx"
+            for path in (first, second, ignored_text, ignored_temporary):
+                path.write_text("", encoding="utf-8")
+
+            responses = iter(
+                (
+                    "multiple",
+                    str(folder),
+                    "2026",
+                    "2024,2028",
+                    "000000023353484",
+                    "87689",
+                    "not-yet-created-output",
+                )
+            )
+
+            configs = interactive_configs(lambda _prompt: next(responses))
+            self.assertEqual(discover_excel_files(folder), (first, second))
+
+        self.assertEqual(
+            [(config.input_excel, config.financial_year) for config in configs],
+            [(first, 2026), (second, 2024), (second, 2028)],
+        )
+
 
 class IntegrationTests(unittest.TestCase):
+    def test_multiple_dummy_workbooks_generate_each_requested_year(self) -> None:
+        project_config = default_config()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            input_folder = base / "input"
+            output_folder = base / "output"
+            input_folder.mkdir()
+
+            first = input_folder / "first.xlsx"
+            second = input_folder / "second.xlsx"
+            write_dummy_workbook(
+                first,
+                (
+                    ("111111111111111", "2023-03-10", "NA", "00000", "100.00"),
+                    ("111111111111111", "2025-04-20", "NA", "", "200.00"),
+                    ("111111111111111", "2025-05-01", "NB", "", "999.00"),
+                ),
+            )
+            write_dummy_workbook(
+                second,
+                (
+                    ("222222222222222", "2026-12-15", "NA", None, "300.00"),
+                    ("222222222222222", "2027-01-05", "NA", "00000", "400.00"),
+                ),
+            )
+
+            responses = iter(
+                (
+                    "multiple",
+                    str(input_folder),
+                    "2024,2026",
+                    "2027",
+                    "000000023353484",
+                    "87689",
+                    str(output_folder),
+                )
+            )
+
+            configs = interactive_configs(lambda _prompt: next(responses))
+            results = generate_finance_files_for_configs(configs)
+
+            self.assertEqual(
+                [(summary.policy_number, summary.annual_total) for _files, summary in results],
+                [
+                    ("111111111111111", Decimal("100.00")),
+                    ("111111111111111", Decimal("200.00")),
+                    ("222222222222222", Decimal("700.00")),
+                ],
+            )
+            expected_outputs = (
+                output_folder / "111111111111111" / "2024" / "financial.txt",
+                output_folder / "111111111111111" / "2026" / "financial.txt",
+                output_folder / "222222222222222" / "2027" / "financial.txt",
+            )
+            self.assertTrue(all(path.is_file() for path in expected_outputs))
+            self.assertTrue(all(files.member.is_file() and files.advisor.is_file() for files, _summary in results))
+
     def test_dummy_workbook_generates_expected_finance_file(self) -> None:
         project_config = default_config()
         with tempfile.TemporaryDirectory() as temporary_directory:

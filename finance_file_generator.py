@@ -51,6 +51,7 @@ ANNUAL_TOTAL_COLUMN = "CURRENT AMOUNT/INCOME PROTECTION AMOUNT"
 ARREARS_COLUMN = "ARREARS AMOUNT"
 ZERO = Decimal("0.00")
 MAX_FINANCE_AMOUNT = Decimal("9999999999999999.99")
+EXCEL_FILE_SUFFIXES = (".xlsx", ".xlsm")
 
 
 @dataclass(frozen=True)
@@ -131,9 +132,93 @@ def parse_financial_year_input(value: str) -> int:
 
     normalized = require_input(value, "Financial year")
     try:
-        return int(normalized)
+        financial_year = int(normalized)
     except ValueError as error:
         raise ValueError("Financial year must be a four-digit integer.") from error
+    if financial_year < 1000 or financial_year > 9999:
+        raise ValueError("Financial year must be a four-digit integer.")
+    return financial_year
+
+
+def parse_financial_years_input(value: str) -> tuple[int, ...]:
+    """Convert a comma-separated financial-year response to integers."""
+
+    normalized = require_input(value, "Financial years")
+    parts = [part.strip() for part in normalized.split(",")]
+    if any(not part for part in parts):
+        raise ValueError("Financial years must be comma-separated four-digit integers.")
+    years = tuple(parse_financial_year_input(part) for part in parts)
+    if len(set(years)) != len(years):
+        raise ValueError("Financial years must not contain duplicates.")
+    return years
+
+
+def parse_run_mode_input(value: str) -> str:
+    """Return the selected workbook input mode."""
+
+    normalized = require_input(value, "Input mode").strip().lower()
+    if normalized in ("1", "single", "s"):
+        return "single"
+    if normalized in ("2", "multiple", "m"):
+        return "multiple"
+    raise ValueError("Input mode must be single or multiple.")
+
+
+def discover_excel_files(folder_path: Path) -> tuple[Path, ...]:
+    """Return supported Excel workbooks directly inside a folder."""
+
+    if not folder_path.is_dir():
+        raise NotADirectoryError(f"Excel folder not found: {folder_path}")
+    excel_files = tuple(
+        sorted(
+            path
+            for path in folder_path.iterdir()
+            if path.is_file()
+            and path.suffix.lower() in EXCEL_FILE_SUFFIXES
+            and not path.name.startswith("~$")
+        )
+    )
+    if not excel_files:
+        raise FileNotFoundError(f"No Excel files found in folder: {folder_path}")
+    return excel_files
+
+
+def build_config(
+    input_excel: Path,
+    financial_year: int,
+    directory_id: str,
+    advisor_id: str,
+    output_directory: Path,
+) -> Config:
+    """Create and validate one generator configuration."""
+
+    return validate_config(
+        Config(
+            input_excel=input_excel,
+            financial_year=financial_year,
+            directory_id=directory_id,
+            template_file=TEMPLATE_FILE,
+            member_template_file=MEMBER_TEMPLATE_FILE,
+            advisor_template_file=ADVISOR_TEMPLATE_FILE,
+            advisor_id=advisor_id,
+            output_base_directory=output_directory,
+        )
+    )
+
+
+def build_configs_for_workbook_years(
+    workbook_years: Sequence[tuple[Path, Sequence[int]]],
+    directory_id: str,
+    advisor_id: str,
+    output_directory: Path,
+) -> tuple[Config, ...]:
+    """Build one configuration for each workbook and requested year."""
+
+    return tuple(
+        build_config(workbook, year, directory_id, advisor_id, output_directory)
+        for workbook, years in workbook_years
+        for year in years
+    )
 
 
 def interactive_config(input_function: Callable[[str], str] = input) -> Config:
@@ -169,6 +254,57 @@ def interactive_config(input_function: Callable[[str], str] = input) -> Config:
             advisor_id=advisor_id,
             output_base_directory=output_directory,
         )
+    )
+
+
+def interactive_configs(input_function: Callable[[str], str] = input) -> tuple[Config, ...]:
+    """Prompt for one or more workbooks and return validated run configurations."""
+
+    mode = parse_run_mode_input(input_function("Mode (single/multiple): "))
+    if mode == "single":
+        input_excel = resolve_input_path(
+            input_function("Excel file path: "),
+            "Excel file path",
+        )
+        years = parse_financial_years_input(
+            input_function("Financial years (comma-separated, for example 2024,2026): ")
+        )
+        workbook_years = ((input_excel, years),)
+    else:
+        excel_folder = resolve_input_path(
+            input_function("Excel folder path: "),
+            "Excel folder path",
+        )
+        workbook_years = tuple(
+            (
+                excel_file,
+                parse_financial_years_input(
+                    input_function(
+                        f"Financial years for {excel_file.name} "
+                        "(comma-separated, for example 2024,2026): "
+                    )
+                ),
+            )
+            for excel_file in discover_excel_files(excel_folder)
+        )
+
+    directory_id = require_input(
+        input_function("15-digit Directory/Client ID: "),
+        "Directory ID",
+    )
+    advisor_id = require_input(
+        input_function("5-digit Advisor ID: "),
+        "Advisor ID",
+    )
+    output_directory = resolve_input_path(
+        input_function("Base output directory: "),
+        "Base output directory",
+    )
+    return build_configs_for_workbook_years(
+        workbook_years,
+        directory_id,
+        advisor_id,
+        output_directory,
     )
 
 
@@ -445,6 +581,8 @@ def repair_wrapped_header(header_record: str) -> str:
 
     repairs = {
         "FUND ENTITYCODE": "FUND ENTITY CODE",
+        "TAX SOURCECODE": "TAX CODE",
+        "TAXSOURCECODE": "TAX CODE",
         "TAXCODE": "TAX CODE",
         "NATURE OFPERSON": "NATURE OF PERSON",
         "PASSPORT COUNTRY OFISSUE": "PASSPORT COUNTRY OF ISSUE",
@@ -754,15 +892,28 @@ def generate_finance_files(config: Config) -> tuple[GeneratedFiles, FinanceSumma
     return written, summary
 
 
+def generate_finance_files_for_configs(
+    configs: Sequence[Config],
+) -> tuple[tuple[GeneratedFiles, FinanceSummary], ...]:
+    """Generate output files for each configured workbook/year run."""
+
+    if not configs:
+        raise ValueError("At least one generation configuration is required.")
+    return tuple(generate_finance_files(config) for config in configs)
+
+
 def main() -> None:
     """Prompt for runtime settings and generate all three files."""
 
-    output_files, summary = generate_finance_files(interactive_config())
-    print(f"Generated finance file: {output_files.financial}")
-    print(f"Generated member file: {output_files.member}")
-    print(f"Generated advisor file: {output_files.advisor}")
-    print(f"Policy Number: {summary.policy_number}")
-    print(f"Annual Total: {format_amount(summary.annual_total)}")
+    results = generate_finance_files_for_configs(interactive_configs())
+    for index, (output_files, summary) in enumerate(results, start=1):
+        if len(results) > 1:
+            print(f"Run {index} of {len(results)}")
+        print(f"Generated finance file: {output_files.financial}")
+        print(f"Generated member file: {output_files.member}")
+        print(f"Generated advisor file: {output_files.advisor}")
+        print(f"Policy Number: {summary.policy_number}")
+        print(f"Annual Total: {format_amount(summary.annual_total)}")
 
 
 if __name__ == "__main__":
