@@ -13,13 +13,13 @@ The program asks for an input mode:
 
 In both modes, years are entered as a comma-separated list such as `2024,2026,2028`. Duplicate years are rejected to avoid overwriting the same output set twice in one run.
 
-For multiple mode, the program asks for a separate year list for each discovered workbook. Workbooks are processed in sorted filename order. Supported file types are `.xlsx` and `.xlsm`; temporary Excel lock files beginning with `~$` are ignored.
+For each workbook, the program asks for that workbook's year list, 15-digit Directory ID, and five-digit Advisor ID. If one workbook has multiple requested years, the same Directory ID and Advisor ID apply to all generated years for that workbook.
 
-Directory ID, Advisor ID, and base output directory remain shared for all requested runs.
+For multiple mode, workbooks are processed in sorted filename order. Supported file types are `.xlsx` and `.xlsm`; temporary Excel lock files beginning with `~$` are ignored. The base output directory remains shared for all requested runs.
 
 ## Generation Flow
 
-The existing `Config` object and `generate_finance_files(config)` function remain the single-run contract. The new interactive layer converts the user's selected workbooks and year lists into one `Config` per workbook/year pair, then loops through those configs.
+The existing `Config` object and `generate_finance_files(config)` function remain the single-run contract. The new interactive layer converts each selected workbook, year list, Directory ID, and Advisor ID into one `Config` per workbook/year pair, then loops through those configs.
 
 This keeps the workbook parsing, filtering, aggregation, template transformation, and output writing behavior unchanged for each individual run.
 

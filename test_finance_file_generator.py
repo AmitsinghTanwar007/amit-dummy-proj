@@ -117,6 +117,8 @@ class InteractiveConfigTests(unittest.TestCase):
 
         self.assertEqual([config.input_excel for config in configs], [project_config.input_excel.resolve()] * 2)
         self.assertEqual([config.financial_year for config in configs], [2026, 2024])
+        self.assertEqual([config.directory_id for config in configs], ["000000023353484"] * 2)
+        self.assertEqual([config.advisor_id for config in configs], ["87689"] * 2)
         self.assertEqual(
             [config.output_base_directory for config in configs],
             [(Path.cwd() / "not-yet-created-output").resolve()] * 2,
@@ -137,9 +139,11 @@ class InteractiveConfigTests(unittest.TestCase):
                     "multiple",
                     str(folder),
                     "2026",
-                    "2024,2028",
                     "000000023353484",
                     "87689",
+                    "2024,2028",
+                    "000000023353485",
+                    "87690",
                     "not-yet-created-output",
                 )
             )
@@ -148,8 +152,20 @@ class InteractiveConfigTests(unittest.TestCase):
             self.assertEqual(discover_excel_files(folder), (first, second))
 
         self.assertEqual(
-            [(config.input_excel, config.financial_year) for config in configs],
-            [(first, 2026), (second, 2024), (second, 2028)],
+            [
+                (
+                    config.input_excel,
+                    config.financial_year,
+                    config.directory_id,
+                    config.advisor_id,
+                )
+                for config in configs
+            ],
+            [
+                (first, 2026, "000000023353484", "87689"),
+                (second, 2024, "000000023353485", "87690"),
+                (second, 2028, "000000023353485", "87690"),
+            ],
         )
 
 
@@ -165,9 +181,11 @@ class IntegrationTests(unittest.TestCase):
                     "multiple",
                     str(input_folder),
                     "2024,2026",
-                    "2027",
                     "000000023353484",
                     "87689",
+                    "2027",
+                    "000000023353485",
+                    "87690",
                     str(output_folder),
                 )
             )
@@ -201,6 +219,14 @@ class IntegrationTests(unittest.TestCase):
             )
             self.assertTrue(all(path.is_file() for path in expected_outputs))
             self.assertTrue(all(files.member.is_file() and files.advisor.is_file() for files, _summary in results))
+            self.assertEqual(
+                [(config.directory_id, config.advisor_id) for config in configs],
+                [
+                    ("000000023353484", "87689"),
+                    ("000000023353484", "87689"),
+                    ("000000023353485", "87690"),
+                ],
+            )
 
     def test_dummy_workbook_generates_expected_finance_file(self) -> None:
         project_config = default_config()

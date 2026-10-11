@@ -213,16 +213,14 @@ def build_config(
 
 
 def build_configs_for_workbook_years(
-    workbook_years: Sequence[tuple[Path, Sequence[int]]],
-    directory_id: str,
-    advisor_id: str,
+    workbook_years: Sequence[tuple[Path, Sequence[int], str, str]],
     output_directory: Path,
 ) -> tuple[Config, ...]:
     """Build one configuration for each workbook and requested year."""
 
     return tuple(
         build_config(workbook, year, directory_id, advisor_id, output_directory)
-        for workbook, years in workbook_years
+        for workbook, years, directory_id, advisor_id in workbook_years
         for year in years
     )
 
@@ -275,7 +273,15 @@ def interactive_configs(input_function: Callable[[str], str] = input) -> tuple[C
         years = parse_financial_years_input(
             input_function("Financial years (comma-separated, for example 2024,2026): ")
         )
-        workbook_years = ((input_excel, years),)
+        directory_id = require_input(
+            input_function(f"15-digit Directory/Client ID for {input_excel.name}: "),
+            "Directory ID",
+        )
+        advisor_id = require_input(
+            input_function(f"5-digit Advisor ID for {input_excel.name}: "),
+            "Advisor ID",
+        )
+        workbook_years = ((input_excel, years, directory_id, advisor_id),)
     else:
         excel_folder = resolve_input_path(
             input_function("Excel folder path: "),
@@ -290,26 +296,24 @@ def interactive_configs(input_function: Callable[[str], str] = input) -> tuple[C
                         "(comma-separated, for example 2024,2026): "
                     )
                 ),
+                require_input(
+                    input_function(f"15-digit Directory/Client ID for {excel_file.name}: "),
+                    "Directory ID",
+                ),
+                require_input(
+                    input_function(f"5-digit Advisor ID for {excel_file.name}: "),
+                    "Advisor ID",
+                ),
             )
             for excel_file in discover_excel_files(excel_folder)
         )
 
-    directory_id = require_input(
-        input_function("15-digit Directory/Client ID: "),
-        "Directory ID",
-    )
-    advisor_id = require_input(
-        input_function("5-digit Advisor ID: "),
-        "Advisor ID",
-    )
     output_directory = resolve_input_path(
         input_function("Base output directory: "),
         "Base output directory",
     )
     return build_configs_for_workbook_years(
         workbook_years,
-        directory_id,
-        advisor_id,
         output_directory,
     )
 
