@@ -57,6 +57,8 @@ The program stops with a clear error when:
 
 Policy values from `Policy Number` or `Policy No` are used as supplied after basic text normalization. They are not restricted to 15 digits and may contain non-digit characters.
 
+Blank `Transaction Amount` values, including empty cells and whitespace-only text, are treated as zero. Non-empty invalid amount values still stop the run with a clear error.
+
 The workbook's `System Date` values are parsed using the strict `YYYY-MM-DD` pattern. The source workbook created for this project stores them as text in that format.
 
 ## Aggregation

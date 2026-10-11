@@ -24,6 +24,7 @@ from finance_file_generator import (
     interactive_config,
     interactive_configs,
     normalize_policy_number,
+    parse_amount,
     parse_financial_years_input,
     parse_run_mode_input,
     read_source_rows,
@@ -127,6 +128,17 @@ class FormattingTests(unittest.TestCase):
     def test_amount_format(self) -> None:
         self.assertEqual(format_amount(Decimal("336.17")), "0000000000000336.17")
         self.assertEqual(format_amount(Decimal("0")), "0000000000000000.00")
+
+
+class AmountParsingTests(unittest.TestCase):
+    def test_blank_amount_values_are_zero(self) -> None:
+        self.assertEqual(parse_amount(None, 2), Decimal("0.00"))
+        self.assertEqual(parse_amount("", 2), Decimal("0.00"))
+        self.assertEqual(parse_amount("   ", 2), Decimal("0.00"))
+
+    def test_non_empty_invalid_amount_still_fails(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid Transaction Amount"):
+            parse_amount("not-an-amount", 2)
 
 
 class InteractiveConfigTests(unittest.TestCase):

@@ -471,7 +471,11 @@ def normalize_policy_number(value: object, excel_row_number: int) -> str:
 def parse_amount(value: object, excel_row_number: int) -> Decimal:
     """Convert one transaction amount to Decimal."""
 
-    if value is None or isinstance(value, bool):
+    if value is None:
+        return ZERO
+    if isinstance(value, str) and not value.strip():
+        return ZERO
+    if isinstance(value, bool):
         raise ValueError(f"Invalid Transaction Amount at Excel row {excel_row_number}: {value!r}")
     try:
         amount = Decimal(str(value).strip())
