@@ -51,10 +51,11 @@ The program stops with a clear error when:
 - the configured financial year is invalid;
 - the Directory ID is not exactly 15 digits;
 - the Advisor ID is not exactly five digits;
-- a retained policy number is not exactly 15 digits;
 - retained records contain more than one policy number;
 - a date or amount cannot be parsed; or
 - no rows remain after applying the code, reversal, and financial-year filters.
+
+Policy values from `Policy Number` or `Policy No` are used as supplied after basic text normalization. They are not restricted to 15 digits and may contain non-digit characters.
 
 The workbook's `System Date` values are parsed using the strict `YYYY-MM-DD` pattern. The source workbook created for this project stores them as text in that format.
 
@@ -99,7 +100,7 @@ The member generator reads `templates/memberfile.txt`, reconstructs its wrapped 
 
 - `TAX YEAR` with the configured financial year;
 - `CLIENT ID` with the configured 15-digit Directory ID;
-- `POLICY ID` with the constant 15-digit policy number from the filtered Excel data;
+- `POLICY ID` with the constant policy number from the filtered Excel data;
 - `POLICY ON DATE` with the earliest qualifying System Date in `YYYY/MM/DD` template format; and
 - `POLICY OFF DATE` with a blank value.
 

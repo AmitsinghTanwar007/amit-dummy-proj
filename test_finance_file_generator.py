@@ -23,6 +23,7 @@ from finance_file_generator import (
     generate_finance_files_for_configs,
     interactive_config,
     interactive_configs,
+    normalize_policy_number,
     parse_financial_years_input,
     parse_run_mode_input,
     read_source_rows,
@@ -110,6 +111,16 @@ class HeaderMapTests(unittest.TestCase):
             rows = read_source_rows(workbook_path)
 
         self.assertEqual(rows[0].policy_number, "111111111111111")
+
+
+class PolicyNumberTests(unittest.TestCase):
+    def test_policy_number_value_is_not_length_or_digit_validated(self) -> None:
+        self.assertEqual(normalize_policy_number("POLICY-12345678901234567890", 2), "POLICY-12345678901234567890")
+        self.assertEqual(normalize_policy_number("123", 2), "123")
+
+    def test_numeric_policy_number_cells_are_kept_without_decimal_suffix(self) -> None:
+        self.assertEqual(normalize_policy_number(1234567890123456, 2), "1234567890123456")
+        self.assertEqual(normalize_policy_number(1234567890123456.0, 2), "1234567890123456")
 
 
 class FormattingTests(unittest.TestCase):

@@ -457,17 +457,15 @@ def parse_system_date(value: object, excel_row_number: int) -> date:
 
 
 def normalize_policy_number(value: object, excel_row_number: int) -> str:
-    """Normalize and validate one policy number as exactly 15 digits."""
+    """Normalize one policy number without enforcing a fixed format."""
 
     if isinstance(value, bool):
-        normalized = str(value)
+        return str(value)
     elif isinstance(value, int):
-        normalized = str(value)
+        return str(value)
     elif isinstance(value, float) and value.is_integer():
-        normalized = str(int(value))
-    else:
-        normalized = str(value).strip() if value is not None else ""
-    return validate_fifteen_digit_id(normalized, f"Policy Number at Excel row {excel_row_number}")
+        return str(int(value))
+    return str(value).strip() if value is not None else ""
 
 
 def parse_amount(value: object, excel_row_number: int) -> Decimal:
