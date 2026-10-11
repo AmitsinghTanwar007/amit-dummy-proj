@@ -31,6 +31,13 @@ REQUIRED_COLUMNS = (
     "Reversal File Code",
     "Transaction Amount",
 )
+REQUIRED_COLUMN_ALIASES = {
+    "Policy Number": ("Policy Number", "Policy No"),
+    "System Date": ("System Date",),
+    "Transaction Code": ("Transaction Code",),
+    "Reversal File Code": ("Reversal File Code",),
+    "Transaction Amount": ("Transaction Amount",),
+}
 
 MONTH_NAMES = (
     "MARCH",
@@ -365,10 +372,12 @@ def build_header_map(headers: Sequence[object]) -> dict[str, int]:
     for index, value in enumerate(headers):
         if isinstance(value, str):
             name = value.strip()
-            if name in REQUIRED_COLUMNS:
-                if name in header_map:
-                    raise ValueError(f"Duplicate required Excel column: {name}")
-                header_map[name] = index
+            for canonical_name, aliases in REQUIRED_COLUMN_ALIASES.items():
+                if name in aliases:
+                    if canonical_name in header_map:
+                        raise ValueError(f"Duplicate required Excel column: {canonical_name}")
+                    header_map[canonical_name] = index
+                    break
 
     missing = [name for name in REQUIRED_COLUMNS if name not in header_map]
     if missing:

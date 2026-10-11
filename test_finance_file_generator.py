@@ -14,6 +14,7 @@ from finance_file_generator import (
     Config,
     MONTH_NAMES,
     SourceRow,
+    build_header_map,
     default_config,
     discover_excel_files,
     filter_by_codes,
@@ -24,6 +25,7 @@ from finance_file_generator import (
     interactive_configs,
     parse_financial_years_input,
     parse_run_mode_input,
+    read_source_rows,
     reconstruct_template_records,
     split_record,
 )
@@ -38,10 +40,14 @@ EXCEL_HEADERS = (
 )
 
 
-def write_dummy_workbook(path: Path, rows: tuple[tuple[object, ...], ...]) -> None:
+def write_dummy_workbook(
+    path: Path,
+    rows: tuple[tuple[object, ...], ...],
+    headers: tuple[str, ...] = EXCEL_HEADERS,
+) -> None:
     workbook = Workbook()
     worksheet = workbook.active
-    worksheet.append(EXCEL_HEADERS)
+    worksheet.append(headers)
     for row in rows:
         worksheet.append(row)
     workbook.save(path)
@@ -57,6 +63,53 @@ class FilteringTests(unittest.TestCase):
             SourceRow("1", "2025-03-01", "NB", "00000", 1),
         )
         self.assertEqual(len(filter_by_codes(rows)), 3)
+
+
+class HeaderMapTests(unittest.TestCase):
+    def test_policy_no_header_is_accepted_as_policy_number(self) -> None:
+        positions = build_header_map(
+            (
+                "Policy No",
+                "System Date",
+                "Transaction Code",
+                "Reversal File Code",
+                "Transaction Amount",
+            )
+        )
+
+        self.assertEqual(positions["Policy Number"], 0)
+
+    def test_policy_number_and_policy_no_together_are_ambiguous(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Duplicate required Excel column: Policy Number"):
+            build_header_map(
+                (
+                    "Policy Number",
+                    "Policy No",
+                    "System Date",
+                    "Transaction Code",
+                    "Reversal File Code",
+                    "Transaction Amount",
+                )
+            )
+
+    def test_workbook_with_policy_no_header_reads_policy_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            workbook_path = Path(temporary_directory) / "policy-no.xlsx"
+            write_dummy_workbook(
+                workbook_path,
+                (("111111111111111", "2025-04-20", "NA", "", "200.00"),),
+                headers=(
+                    "Policy No",
+                    "System Date",
+                    "Transaction Code",
+                    "Reversal File Code",
+                    "Transaction Amount",
+                ),
+            )
+
+            rows = read_source_rows(workbook_path)
+
+        self.assertEqual(rows[0].policy_number, "111111111111111")
 
 
 class FormattingTests(unittest.TestCase):

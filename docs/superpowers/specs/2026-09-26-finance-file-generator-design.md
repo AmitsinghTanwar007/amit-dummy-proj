@@ -28,6 +28,8 @@ The program reads these columns by exact header name and ignores every other col
 - `Reversal File Code`
 - `Transaction Amount`
 
+The `Policy Number` column may also be supplied as `Policy No`. If both `Policy Number` and `Policy No` appear in the same worksheet, the workbook is rejected as ambiguous.
+
 ## Filtering
 
 Rows are filtered only in memory. The source workbook remains unchanged.
